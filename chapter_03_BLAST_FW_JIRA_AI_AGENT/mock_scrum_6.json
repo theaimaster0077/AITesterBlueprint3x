@@ -1,0 +1,8 @@
+{
+  "issueKey": "SCRUM-6",
+  "fields": {
+    "summary": "Fetch Test Plan",
+    "description": "As a QA engineer, I want to fetch a Jira issue and generate a test plan so that I don't have to write it from scratch.",
+    "acceptanceCriteria": "1. Must read the Jira ID.\n2. Must generate a test plan in Markdown format.\n3. Must adhere to the RICE-POT anti-hallucination rules.\n4. Output must match the VMO test plan template."
+  }
+}

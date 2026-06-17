@@ -1,86 +1,53 @@
-// Layer 2 — Navigation. Express proxy: routes request -> jiraClient -> testPlan(groqClient) -> response.
-// Also fixes browser CORS to Jira and keeps the API token server-side.
-import express from 'express';
-import dotenv from 'dotenv';
-import path from 'node:path';
-import fs from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { fetchIssue } from './tools/jiraClient.js';
-import { generateTestPlan, renderMarkdown } from './tools/testPlan.js';
+require('dotenv').config();
+const express = require('express');
+const cors = require('cors');
+const fs = require('fs/promises');
+const path = require('path');
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-dotenv.config({ path: path.join(__dirname, '.env') });
+// Tools
+const { fetchJiraIssue } = require('./tools/jira');
+const { generateTestPlan } = require('./tools/groq');
 
-const PORT = process.env.PORT || 8787;
 const app = express();
-app.use(express.json({ limit: '1mb' }));
+app.use(cors());
+app.use(express.json());
 
-function envConfig() {
-  return {
-    jiraUrl: process.env.JIRA_URL || '',
-    jiraEmail: process.env.JIRA_EMAIL || '',
-    jiraToken: process.env.JIRA_API_TOKEN || process.env.JIRA_TOKEN || '',
-    groqKey: process.env.GROQ_KEY || '',
-  };
-}
+app.post('/api/generate-plan', async (req, res) => {
+    const { issueKey } = req.body;
+    if (!issueKey) {
+        return res.status(400).json({ error: 'Jira issueKey is required.' });
+    }
 
-// UI-provided non-empty values override .env defaults.
-function mergeConfig(body = {}) {
-  const env = envConfig();
-  const c = body.config || {};
-  return {
-    jiraUrl: (c.jiraUrl || '').trim() || env.jiraUrl,
-    jiraEmail: (c.jiraEmail || '').trim() || env.jiraEmail,
-    jiraToken: (c.jiraToken || '').trim() || env.jiraToken,
-    groqKey: (c.groqKey || '').trim() || env.groqKey,
-  };
-}
+    try {
+        console.log(`[Link] Fetching data for ${issueKey}...`);
+        const issueData = await fetchJiraIssue(issueKey);
 
-// Non-secret config presence, so the UI can prefill + warn.
-app.get('/api/config', (_req, res) => {
-  const env = envConfig();
-  res.json({
-    jiraUrl: env.jiraUrl,
-    jiraEmail: env.jiraEmail,
-    hasJiraToken: Boolean(env.jiraToken),
-    hasGroqKey: Boolean(env.groqKey),
-  });
+        console.log(`[Architect] Loading Master System Prompt...`);
+        const promptPath = path.join(__dirname, 'system_prompt.md');
+        const systemPrompt = await fs.readFile(promptPath, 'utf8');
+
+        console.log(`[Trigger] Generating Test Plan via GROQ...`);
+        const markdownOutput = await generateTestPlan(systemPrompt, issueData);
+
+        // Stylize: Save locally as requested in Phase 1 constraints
+        const fileName = `${issueKey}_Test_Plan.md`;
+        const filePath = path.join(__dirname, fileName);
+        await fs.writeFile(filePath, markdownOutput, 'utf8');
+        console.log(`[Stylize] Saved local file: ${fileName}`);
+
+        res.json({ success: true, message: `Test plan saved to ${fileName}`, payload: markdownOutput });
+    } catch (error) {
+        console.error('Error in B.L.A.S.T pipeline:', error.message);
+        res.status(500).json({ success: false, error: error.message });
+    }
 });
 
-app.post('/api/generate', async (req, res) => {
-  try {
-    const jiraId = (req.body?.jiraId || '').trim();
-    if (!jiraId) return res.status(400).json({ error: 'Missing jiraId' });
-
-    const config = mergeConfig(req.body);
-    const issue = await fetchIssue(config, jiraId);
-    const plan = await generateTestPlan(config, issue);
-    const markdown = renderMarkdown(plan, issue);
-
-    res.json({ issue, plan, markdown });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post('/api/save', (req, res) => {
-  try {
-    const jiraId = (req.body?.jiraId || 'plan').trim().replace(/[^A-Za-z0-9_-]/g, '_');
-    const markdown = req.body?.markdown || '';
-    const dir = path.join(__dirname, 'output');
-    fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(path.join(dir, `test-plan-${jiraId}.md`), markdown, 'utf8');
-    res.json({ path: `output/test-plan-${jiraId}.md` });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Serve the built frontend in production (after `npm run build`).
-const dist = path.join(__dirname, 'dist');
-if (fs.existsSync(dist)) {
-  app.use(express.static(dist));
-  app.get(/^(?!\/api).*/, (_req, res) => res.sendFile(path.join(dist, 'index.html')));
+// Only start the server locally, export for Vercel serverless deployment
+if (!process.env.VERCEL) {
+    const PORT = process.env.PORT || 3000;
+    app.listen(PORT, () => {
+        console.log(`🚀 B.L.A.S.T. Jira Agent API running on http://localhost:${PORT}`);
+    });
 }
 
-app.listen(PORT, () => console.log(`[server] proxy listening on http://localhost:${PORT}`));
+module.exports = app;
