@@ -8,7 +8,7 @@ async function fetchJiraIssue(issueKey) {
     // Graceful fallback to local mock data if real credentials aren't provided
     if (!JIRA_DOMAIN || !JIRA_EMAIL || !JIRA_API_TOKEN) {
         console.warn("⚠️ Jira credentials missing. Falling back to local mock_scrum_6.json data.");
-        const mockDataPath = path.join(__dirname, '..', 'mock_scrum_6.json');
+        const mockDataPath = path.join(__dirname, 'mock_scrum_6.json');
         const mockData = await fs.readFile(mockDataPath, 'utf8');
         return JSON.parse(mockData);
     }

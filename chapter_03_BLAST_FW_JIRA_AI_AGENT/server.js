@@ -4,9 +4,9 @@ const cors = require('cors');
 const fs = require('fs/promises');
 const path = require('path');
 
-// Tools
-const { fetchJiraIssue } = require('./tools/jira');
-const { generateTestPlan } = require('./tools/groq');
+// Tools (Updated to point to the current directory)
+const { fetchJiraIssue } = require('./jira');
+const { generateTestPlan } = require('./groq');
 
 const app = express();
 app.use(cors());

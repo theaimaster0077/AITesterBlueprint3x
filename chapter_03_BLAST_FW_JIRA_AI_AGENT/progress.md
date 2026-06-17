@@ -7,4 +7,5 @@
 - **Phase 2 (Link/Architect):** Blueprint approved. Simulated fetch of SCRUM-6 via Atlassian MCP. Master RICE-POT prompt drafted in `system_prompt.md`.
 - **Phase 3 (Stylize & Trigger):** Simulated LLM execution successfully completed. Generated `SCRUM-6_Test_Plan.md` payload strictly matching constraints.
 - **Phase 4 (Execution):** Node/Express API created with `server.js`, `tools/jira.js`, and `tools/groq.js` to run the full B.L.A.S.T pipeline in a real environment.
-- **Phase 5 (Deploy):** Added `vercel.json` config and refactored `server.js` to cleanly export the Express app for Vercel's Node runtime.
+- **Phase 5 (Deploy):** Added `vercel.json` config and refactored `server.js`. API successfully deployed to Vercel.
+- **Phase 6 (UI):** Initialized Vite + React setup. Created `src/App.jsx` to fetch and render the Markdown payload.
